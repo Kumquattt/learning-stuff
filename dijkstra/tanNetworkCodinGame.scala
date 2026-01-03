@@ -1,6 +1,7 @@
 import math._
 import scala.util._
 import scala.io.StdIn._
+import collection.mutable.SortedMap
 
 object Solution extends App {
     val startPoint = readLine.split(':')(1)
@@ -39,14 +40,14 @@ object Dijkstra {
 
     private def initializeVerticesMap(start: String, stops: Seq[Stop]) = {
         var verticesFromStart = stops.map(stop => stop.id -> Vertex.init(stop))
-            .to(collection.mutable.SortedMap)
+            .to(SortedMap)
         verticesFromStart(start) = verticesFromStart(start).copy(
             distanceFromInitial = 0,
             pathFromInitial = Seq(start))
         verticesFromStart
     }
 
-    private def dijkstraRecursive(currentId: String, edges: Seq[Edge], vertices: collection.mutable.SortedMap[String, Vertex]): Unit = {
+    private def dijkstraRecursive(currentId: String, edges: Seq[Edge], vertices: SortedMap[String, Vertex]): Unit = {
         // 2. Set the current node as the one with the smallest distance to the initial node
         val currentVertex: Vertex = vertices(currentId) 
         val neighboursIds: Seq[String] = edges.collect {
@@ -57,20 +58,18 @@ object Dijkstra {
 
         // 3. For each non-visited neighbour 
         nonVisitedNeighbours.foreach(neighbourId => updateNeighbourIfNeeded(currentVertex, neighbourId, vertices))
+
         // 4. Mark the current node as visited
         vertices(currentVertex.id) = currentVertex.copy(visited = true)
+
         // 5. Repeat for non-visited nodes
         val nonVisitedVertices = vertices.filter(idVertex => !idVertex._2.visited)
         if(!nonVisitedVertices.isEmpty) {
-            val closestNonVisitedVertices: collection.mutable.SortedMap[String, Vertex] = collection.mutable.SortedMap(nonVisitedVertices
-                .toSeq
-                .sortBy(_._2.distanceFromInitial):_*)
-            val newCurrent = closestNonVisitedVertices.firstKey
-            dijkstraRecursive(newCurrent, edges, vertices)
+            dijkstraRecursive(getNewCurrentVertexId(nonVisitedVertices), edges, vertices)
         }
     }
 
-    private def updateNeighbourIfNeeded(currentVertex: Vertex, neighbourId: String, vertices: collection.mutable.SortedMap[String, Vertex]) = {
+    private def updateNeighbourIfNeeded(currentVertex: Vertex, neighbourId: String, vertices: SortedMap[String, Vertex]) = {
         var neighbour = vertices(neighbourId)
         //     1. add the current distance with the edge's weight
         val distanceToCurrent = currentVertex.distance(neighbour)
@@ -85,7 +84,13 @@ object Dijkstra {
         }
     }
 
-    def printRouteFromStartToEnd(end: String, verticesFromStart: collection.mutable.SortedMap[String, Vertex]) = {
+    private def getNewCurrentVertexId(nonVisitedVertices: SortedMap[String, Vertex]): String = {
+        val closestNonVisitedVertices= SortedMap(nonVisitedVertices.toSeq
+            .sortBy(_._2.distanceFromInitial):_*)
+        closestNonVisitedVertices.firstKey
+    }
+
+    def printRouteFromStartToEnd(end: String, verticesFromStart: SortedMap[String, Vertex]) = {
         val startToEndRoute = verticesFromStart(end).pathFromInitial
         if(startToEndRoute.isEmpty) {
             println("IMPOSSIBLE")
