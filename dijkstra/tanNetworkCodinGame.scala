@@ -3,12 +3,8 @@ import scala.util._
 import scala.io.StdIn._
 
 /**
- * https://www.codingame.com/ide/puzzle/tan-network
- *
- * TODO : 
- * - rewrite the vertices use to keep a mutable list, with initial values at infinite distance
- * - Implement looking at every vertex or put recursivity
- * etc
+ * Auto-generated code below aims at helping you parse
+ * the standard input according to the problem statement.
  **/
 object Solution extends App {
     val startPoint = readLine.split(':')(1)
@@ -35,14 +31,14 @@ object Solution extends App {
     // SETUP
     //
     val stops = stopsRaw.map(raw => Stop(
-        raw(0), raw(1),
+        raw(0), raw(1).replaceAll("\"", ""),
         Coord(raw(3).toDouble, raw(4).toDouble),
     ))
     val edges = routesRaw.map(raw => Edge(raw(0), raw(1)))
-    println(stops.mkString(", "))
-    println(edges.mkString(", "))
-    println(s"$startPoint -> $endPoint")
-    println("---")
+    //Console.err.println(stops.mkString(", "))
+    //Console.err.println(edges.mkString(", "))
+    //Console.err.println(s"$startPoint -> $endPoint")
+    //Console.err.println("---")
     
     // Write an answer using println
     // To debug: Console.err.println("Debug messages...")
@@ -58,39 +54,70 @@ object Dijkstra {
         val initialStop = stops.filter(s => s.id == start)(0)
 
         // 1. Select starting node, set its distance to 0. Set every other node distance to infinity
-        val initialVertex = Vertex(start, 0, Seq(start))
-        var vertices = Seq(initialVertex)
+        var verticesFromStart = stops.map(stop => stop.id -> Vertex.init(stop)).to(collection.mutable.SortedMap)
+        verticesFromStart(start) = verticesFromStart(start).copy(
+            distanceFromInitial = 0,
+            pathFromInitial = Seq(start))
+        //println(s"Vertices Map = ${verticesFromStart.toString}")
        
-        // 2. Set the current node as the one with the smallest distance to the initial node
-        // 3. For each non-visited neighbour 
-        //     1. add the current distance with the edge's weight
-        //     2. If it's smaller to the neighbour's distance to the initial node, replace it
-        // 4. Mark the current node as visited
-        // 5. Repeat for non-visited nodes
+        // TODO WIP
+        verticesFromStart = dijkstra(start, edges, verticesFromStart)
+        //println("Vertices: ")
+        //verticesFromStart.foreach(v => println(s"- $v"))
 
-        // INITIAL NODE NEIGHBOURS
-        val currentStop = start
-        val neighboursAsVertices = edges.filter(edge => edge.startId == currentStop)
-            .map(edge => edge.endId)
-            .map(neighbourId => {
-                val neighbour = stops.filter(s => s.id == neighbourId)(0)
-                val distance = initialStop.distance(neighbour)
-                val path = initialVertex.pathFromInitial ++ Seq(neighbourId)
-                // TODO Path update if new distance inferior
-                Vertex(neighbourId, distance, path)
-            })
-        vertices = vertices ++ neighboursAsVertices
-
-        for {
-            currentNode <- neighboursAsVertices
-            neighbourId <- edges.filter(edge => edge.startId == currentNode.id).map(_.endId).filter(id => !vertices.exists(v => v.id == id))
-        } yield ()
-        
-        println(vertices.mkString(", "))
-        println("WIP")
+        printRouteFromStartToEnd(end, verticesFromStart)
     }
 
-    def ???()
+    def dijkstra(currentId: String, edges: Seq[Edge], vertices: collection.mutable.SortedMap[String, Vertex]): collection.mutable.SortedMap[String, Vertex] = {
+        // 2. Set the current node as the one with the smallest distance to the initial node
+        val currentVertex: Vertex = vertices(currentId) 
+        //println(s"Current vertex: $currentVertex")
+        val neighboursIds: Seq[String] = edges.collect {
+        case Edge(currentVertex.id, n) => n
+        case Edge(n, currentVertex.id) => n
+        }
+        //Console.err.println(s"neighboursIds : $neighboursIds")
+        val nonVisitedNeighbours = neighboursIds.filter(id => !vertices(id).visited)
+        //Console.err.println(s"nonVisitedNeighbours : ${nonVisitedNeighbours.toString}")
+
+       
+        // 3. For each non-visited neighbour 
+        nonVisitedNeighbours.foreach(neighbourId => {
+            var neighbour = vertices(neighbourId)
+            //     1. add the current distance with the edge's weight
+            val distanceToCurrent = currentVertex.distance(neighbour)
+            val newDistance = currentVertex.distanceFromInitial + distanceToCurrent
+            //     2. If it's smaller to the neighbour's distance to the initial node, replace it
+            if(newDistance < neighbour.distanceFromInitial) {
+                neighbour = neighbour.copy(
+                    distanceFromInitial = newDistance,
+                    pathFromInitial = currentVertex.pathFromInitial ++ Seq(neighbour.id)
+                )
+                vertices(neighbourId) = neighbour
+                //println(s"- neighbour: $neighbour")
+            }
+        })
+        // 4. Mark the current node as visited
+        vertices(currentVertex.id) = currentVertex.copy(visited = true)
+        //println(s"currentVertex after visit: ${vertices(currentVertex.id).id} ${vertices(currentVertex.id)}")
+        // 5. Repeat for non-visited nodes
+        val nonVisitedVertices = vertices.filter(idVertex => !idVertex._2.visited)
+        if(!nonVisitedVertices.isEmpty) {
+            val closestNonVisitedVertices: collection.mutable.SortedMap[String, Vertex] = collection.mutable.SortedMap(nonVisitedVertices
+                .toSeq
+                .sortBy(_._2.distanceFromInitial):_*)
+            val newCurrent = closestNonVisitedVertices.firstKey
+            dijkstra(newCurrent, edges, vertices)
+        }
+
+        vertices
+    }
+
+    def printRouteFromStartToEnd(end: String, verticesFromStart: collection.mutable.SortedMap[String, Vertex]) = {
+        val startToEndRoute = verticesFromStart(end).pathFromInitial
+        startToEndRoute.foreach(stop => println(verticesFromStart(stop).stop.name))
+
+    }
 
 }
 
@@ -107,7 +134,9 @@ case class Stop(id: String, name: String, coord: Coord) {
 }
 case class Edge(startId: String, endId: String)
 
-case class Vertex(id: String, distanceFromInitial: Double, pathFromInitial: Seq[String])
+case class Vertex(id: String, distanceFromInitial: Double, pathFromInitial: Seq[String], visited: Boolean, stop: Stop) {
+    def distance(other: Vertex) = this.stop.distance(other.stop)
+}
 object Vertex {
-    def init(id: String) = Vertex(id, Double.PositiveInfinity, Seq.empty)
+    def init(stop: Stop) = Vertex(stop.id, Double.PositiveInfinity, Seq.empty, false, stop)
 }
