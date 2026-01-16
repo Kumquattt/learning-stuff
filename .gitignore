@@ -1,0 +1,6 @@
+*/.metals
+*/.scala-build/*
+*/.idea/*
+/.idea
+
+graph-theory/.vscode/settings.json
